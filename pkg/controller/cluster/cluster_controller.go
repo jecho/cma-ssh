@@ -18,6 +18,8 @@ package cluster
 
 import (
 	"context"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -36,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 // Add creates a new Cluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -206,6 +207,9 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			if err != nil {
 				return reconcile.Result{}, err
 			}
+
+			_, _, err = machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
+				machine.SetSAToken, make(map[string]string))
 
 			// get kubeconfig
 			kubeConfig, _, err := machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],

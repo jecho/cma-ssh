@@ -4,6 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+	"text/template"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/common"
 	clusterv1alpha1 "github.com/samsung-cnct/cma-ssh/pkg/apis/cluster/v1alpha1"
@@ -11,12 +17,7 @@ import (
 	"github.com/samsung-cnct/cma-ssh/pkg/ssh/asset"
 	"github.com/samsung-cnct/cma-ssh/pkg/util"
 	crypto "golang.org/x/crypto/ssh"
-	"io/ioutil"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-	"text/template"
-	"time"
 )
 
 type boostrapConfigInfo struct {
@@ -984,6 +985,46 @@ var DrainAndDeleteNode = func(client *ssh.Client, kubeClient client.Client,
 			hostnameString + " --ignore-daemonsets --kubeconfig=/etc/kubernetes/admin.conf"},
 		ssh.Command{Cmd: "kubectl delete node " + hostnameString +
 			" --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
+
+	return nil, cmd, err
+}
+
+var SetSAToken = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.CnctMachine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			glog.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			glog.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	glog.Info("Obtaining token for SA")
+	glog.Info("testing, grabs default probably in default namespace")
+
+	cmd, err := cr.Run(
+		client.Client,
+		ssh.Command{Cmd: `APISERVER=$(kubectl config view --minify | grep server | cut -f 2- -d ":" | tr -d " ")`},
+		ssh.Command{Cmd: `TOKEN=$(kubectl describe secret $(kubectl get secrets | grep ^default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d " ")`},
+		ssh.Command{Cmd: `kubectl config set-credentials admin
+		 --token=${TOKEN}`},
+		ssh.Command{Cmd: `TOKEN=EMPTY`},
 	)
 
 	return nil, cmd, err

@@ -207,8 +207,12 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 				return reconcile.Result{}, err
 			}
 
+			// set token in kubeconfig
 			_, _, err = machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
 				machine.SetSAToken, make(map[string]string))
+			if err != nil {
+				return reconcile.Result{}, err
+			}
 
 			// get kubeconfig
 			kubeConfig, _, err := machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
@@ -218,6 +222,14 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 
 			err = k8sutil.CreateKubeconfigSecret(r.Client, clusterInstance, r.scheme, kubeConfig)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			// set sa-token permissions
+			//SetSAPermissions
+			_, _, err = machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
+				machine.SetSAPermissions, make(map[string]string))
 			if err != nil {
 				return reconcile.Result{}, err
 			}

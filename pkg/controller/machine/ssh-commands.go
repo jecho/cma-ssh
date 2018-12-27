@@ -1030,3 +1030,35 @@ var SetSAToken = func(client *ssh.Client, kubeClient client.Client,
 	)
 	return nil, cmd, err
 }
+
+var SetSAPermissions = func(client *ssh.Client, kubeClient client.Client,
+	machineInstance *clusterv1alpha1.CnctMachine,
+	templateData boostrapConfigInfo, commandArgs map[string]string) ([]byte, string, error) {
+
+	bout := bufio.NewWriter(os.Stdout)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			glog.Error(err, "could not flush os.Stdout writer")
+		}
+	}(bout)
+
+	berr := bufio.NewWriter(os.Stderr)
+	defer func(w *bufio.Writer) {
+		err := w.Flush()
+		if err != nil {
+			glog.Error(err, "could not flush os.Stderr writer")
+		}
+	}(berr)
+
+	cr := ssh.CommandRunner{
+		Stdout: bout,
+		Stderr: berr,
+	}
+
+	cmd, err := cr.Run(
+		client.Client,
+		ssh.Command{Cmd: `kubectl create clusterrolebinding proxy-cluster-admin --clusterrole=cluster-admin --serviceaccount=default:default --namespace=default --kubeconfig=/etc/kubernetes/admin.conf`},
+	)
+	return nil, cmd, err
+}

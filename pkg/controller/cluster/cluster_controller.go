@@ -227,7 +227,6 @@ func (r *ReconcileCluster) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 
 			// set sa-token permissions
-			//SetSAPermissions
 			_, _, err = machine.RunSshCommand(r.Client, masterMachine, privateKeySecret.Data["private-key"],
 				machine.SetSAPermissions, make(map[string]string))
 			if err != nil {

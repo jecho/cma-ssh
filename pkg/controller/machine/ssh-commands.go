@@ -709,7 +709,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 		ssh.Command{Cmd: "yum list installed --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack"},
 	)
 	if err == nil {
-		glog.Info("deleting conntrack for %s", machineInstance.GetName())
+		glog.Info("deleting conntrack for ", machineInstance.GetName())
 		cmd, err = cr.Run(
 			client.Client,
 			ssh.Command{Cmd: "yum remove --disablerepo='*' --enablerepo=" + bootstrapRepoName + " conntrack -y"},
@@ -720,7 +720,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// delete bootstrap repo file
-	glog.Info("deleting repo file for %s", machineInstance.GetName())
+	glog.Info("deleting repo file for ", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "rm -f /etc/yum.repos.d/" + bootstrapRepoName + ".repo"},
@@ -730,7 +730,7 @@ var DeleteNode = func(client *ssh.Client, kubeClient client.Client,
 	}
 
 	// delete folders
-	glog.Info("deleting folders for %s", machineInstance.GetName())
+	glog.Info("deleting folders for ", machineInstance.GetName())
 	cmd, err = cr.Run(
 		client.Client,
 		ssh.Command{Cmd: "rm -rf /etc/cni"},
@@ -1015,17 +1015,18 @@ var SetSAToken = func(client *ssh.Client, kubeClient client.Client,
 		Stderr: berr,
 	}
 
-	glog.Info("Obtaining token for SA")
-	glog.Info("testing, grabs default probably in default namespace")
-
-	cmd, err := cr.Run(
+	token, cmd, err := cr.GetOutput(
 		client.Client,
-		ssh.Command{Cmd: `APISERVER=$(kubectl config view --minify | grep server | cut -f 2- -d ":" | tr -d " ")`},
-		ssh.Command{Cmd: `TOKEN=$(kubectl describe secret $(kubectl get secrets | grep ^default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d " ")`},
-		ssh.Command{Cmd: `kubectl config set-credentials admin
-		 --token=${TOKEN}`},
-		ssh.Command{Cmd: `TOKEN=EMPTY`},
+		ssh.Command{Cmd: `(kubectl describe secret --kubeconfig=/etc/kubernetes/admin.conf $(kubectl get secrets --kubeconfig=/etc/kubernetes/admin.conf | grep ^default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d " ")`},
 	)
 
+	if err != nil {
+		return nil, cmd, err
+	}
+
+	cmd, err = cr.Run(
+		client.Client,
+		ssh.Command{Cmd: "kubectl config set-credentials kubernetes-admin --token=" + string(token) + " --kubeconfig=/etc/kubernetes/admin.conf"},
+	)
 	return nil, cmd, err
 }
